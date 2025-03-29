@@ -12,6 +12,7 @@ rightDot = (575, 413) # changed to be within where the can will fall
 rightEnd = (485, 327)
 
 DETECTED = False
+IN_RANGE = False
 
 class Camera:
     def __init__(self, port=1):
@@ -168,16 +169,42 @@ def findColor(frame):
         global DETECTED
         DETECTED = True
                 # print(DETECTED)
-        frame = cv.putText(frame, "Blue Detected", (100, 150), cv.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
+        if(IN_RANGE == True):
+            frame = cv.putText(frame, "Within Range", (100, 150), cv.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
+
+        else:
+
+            frame = cv.putText(frame, "Blue Detected", (100, 150), cv.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
             # else:
             #     DETECTED = False
     else:
         DETECTED = False
     return frame
 
+
+def withinRange(frame):
+    blue_lower = np.array([148, 35, 16], np.uint8)
+    blue_upper = np.array([190, 45, 30], np.uint8)
+    mask = cv.inRange(frame, blue_lower, blue_upper)
+    # Uncomment these to see where the blue is detected
+    # res_blue = cv.bitwise_and(frame, frame, mask=mask)
+    # cv.imshow("mask", res_blue)
+    coords = cv.findNonZero(mask)
+    if coords is not None:
+        for point in coords:
+            if checkPixelPolygon((point[0][0], point[0][1]), polyLowerGuide):
+                global IN_RANGE
+                IN_RANGE = True
+            else:
+                IN_RANGE = False
+    else:
+        IN_RANGE = False
+    return
+
+
 if __name__ == "__main__":
     c = Camera()
-    on = False
+    on = True
 
     # establish connection to serial port
     ports = serial.tools.list_ports.comports()
@@ -190,7 +217,8 @@ if __name__ == "__main__":
         
     # picking COM port that arduino is on
     # won't need user input once connected with the pi, but varies from computer to computer
-    # com = input("Select COM port for Arduino #: ")
+    com = input("Select COM port for Arduino #: ")
+    print(com)
     
     # for i in range(len(portsList)):
     #     # ensure input is valid
@@ -211,24 +239,27 @@ if __name__ == "__main__":
     # continuously take in info from the camera and interpret it
     # based on what is seen, perform different actions
     while True:
-        if(write_read(serialInst)):
-            print(serialInst)
-            if not on:
-                c.captureFrame()
-                on = True
-            else:
-                on = False
-                command = "stop"
-                serialInst.write(command.encode('utf-8'))
-                c.closeCamera()
-                cv.destroyAllWindows()
-                break
+        # if(write_read(serialInst)):
+        # if(com == "on"):
+        #     # print(serialInst)
+        #     if not on:
+        #         c.captureFrame()
+        #         on = True
+        #         com == "not on"
+        #     else:
+        #         on = False
+        #         command = "stop"
+        #         serialInst.write(command.encode('utf-8'))
+        #         c.closeCamera()
+        #         cv.destroyAllWindows()
+        #         break
         if on:
             c.captureFrame()
             frame = c.getFrame()
 
             if frame is not None:
-                frame = findColor(frame)
+                withinRange(frame)
+                frame = drawGuide(findColor(frame))
                 cv.imshow('frame', frame)
 
             if(DETECTED == False and currentDetectedState != DETECTED):# detected gets checked/altered in findColour()
@@ -236,13 +267,20 @@ if __name__ == "__main__":
                 serialInst.write(command.encode('utf-8'))
                 currentDetectedState = DETECTED
                 print(command)
-            elif (DETECTED == True and currentDetectedState != DETECTED):
+            elif (DETECTED == True and currentDetectedState != DETECTED and not IN_RANGE):
                 command = "forward"
                 serialInst.write(command.encode('utf-8'))
                 currentDetectedState = DETECTED
                 print(command)
-                # while moving forward, check distance between robot and recycle bin
-                # if within dump distance command = "dump"
+            elif(IN_RANGE == True):
+                # command = "stop"
+                # print(command)
+                # serialInst.write(command.encode('utf-8'))
+                command = "dump"
+                print(command)
+                serialInst.write(command.encode('utf-8'))
+                break
+
         
             # print(currentDetectedState)
 
