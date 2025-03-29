@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import time
+from rplidar import RPLidar
 
 import serial.tools.list_ports # for communication with arduino
 # pip install pyserial
@@ -60,6 +61,19 @@ polyWholeGuide = [(0,480), (640, 480), leftEnd, rightEnd]
 polyLowerGuide = [(0,480), (640, 480), leftDot, rightDot] # used for checking if within distance of bin
 # to stop and deposit can
 
+
+def get_scan():
+    # connect to lidar
+    lidar = RPLidar('COM4', baudrate=115200)
+    # get a single scan from lidar
+    for scan in lidar.iter_scans(max_buf_meas=500):
+        break
+    # cleanly disconnect lidar
+    lidar.stop()
+    lidar.stop_motor()
+    lidar.disconnect()
+    # return scan
+    return scan
 
 # more generalized form. pass in list of cords that make up the polygon
 # form of polygon = [(0,0), (0,1)] etc
@@ -217,8 +231,8 @@ if __name__ == "__main__":
         
     # picking COM port that arduino is on
     # won't need user input once connected with the pi, but varies from computer to computer
-    com = input("Select COM port for Arduino #: ")
-    print(com)
+    # com = input("Select COM port for Arduino #: ")
+    # print(com)
     
     # for i in range(len(portsList)):
     #     # ensure input is valid
@@ -240,12 +254,10 @@ if __name__ == "__main__":
     # based on what is seen, perform different actions
     while True:
         # if(write_read(serialInst)):
-        # if(com == "on"):
         #     # print(serialInst)
         #     if not on:
         #         c.captureFrame()
         #         on = True
-        #         com == "not on"
         #     else:
         #         on = False
         #         command = "stop"
