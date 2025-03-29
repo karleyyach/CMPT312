@@ -13,6 +13,8 @@ rightEnd = (485, 327)
 
 DETECTED = False
 
+IN_RANGE = False
+
 class Camera:
     def __init__(self, port=0):
         self.port = port
@@ -167,6 +169,26 @@ def findColor(frame):
         DETECTED = False
     return frame
 
+
+def withinRange(frame):
+    blue_lower = np.array([148, 35, 16], np.uint8)
+    blue_upper = np.array([190, 45, 30], np.uint8)
+    mask = cv.inRange(frame, blue_lower, blue_upper)
+    # Uncomment these to see where the blue is detected
+    # res_blue = cv.bitwise_and(frame, frame, mask=mask)
+    # cv.imshow("mask", res_blue)
+    coords = cv.findNonZero(mask)
+    if coords is not None:
+        for point in coords:
+            if checkPixelPolygon((point[0][0], point[0][1]), polyLowerGuide):
+                global IN_RANGE
+                IN_RANGE = True
+            else:
+                IN_RANGE = False
+    else:
+        IN_RANGE = False
+    return
+
 if __name__ == "__main__":
     c = Camera()
 
@@ -211,6 +233,14 @@ if __name__ == "__main__":
             currentDetectedState = DETECTED
             # while moving forward, check distance between robot and recycle bin
             # if within dump distance command = "dump"
+            if(IN_RANGE == True):
+                command = "stop"
+                serialInst.write(command.encode('utf-8'))
+                command = "dump"
+                serialInst.write(command.encode('utf-8'))
+
+
+
         
         print(DETECTED)
 
@@ -226,6 +256,7 @@ if __name__ == "__main__":
         frame = c.getFrame()
         
         if frame is not None:
+            withinRange(frame)
             cv.imshow('frame', findColor(drawGuide(frame)))
 
         key = cv.waitKey(1)
