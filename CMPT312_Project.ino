@@ -44,7 +44,7 @@ Servo armServo;
 #define ReverseSlow 80
 #define ReverseFast 60
 // Time in ms for the Rover to turn. Must be fine tuned
-#define TurnTimer 750
+#define TurnTimer 150
 #define DECODE_NEC
 #define IR_RECEIVE_PIN 6
 Servo roverS1;
@@ -53,8 +53,6 @@ Servo roverS2;
 
 
 void setup() {
-  // put your setup code here, to run once:
-
   Serial.begin(115200);
   while (!Serial)
       ; 
@@ -79,17 +77,9 @@ void setup() {
   roverS1.attach(10);
   roverS2.attach(11);
 
-  // wait for button press 
-  
-
-
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  //dumpArm();
-  //delay(2000);
-
   if(IrReceiver.decode()){
     if (IrReceiver.decodedIRData.command == 0x1) {
           Serial.println("Button Pressed = PLAY/PAUSE");
@@ -110,13 +100,7 @@ void loop() {
       dumpArm();
 
     }
-    
   }
-  //delay(2000);
-  //roverForward();
-  //delay(2000);
-  //roverHalt();
-  //delay(100000);
 
 }
 
