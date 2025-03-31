@@ -15,7 +15,10 @@ rightEnd = (485, 327)
 DETECTED = False
 
 IN_RANGE = False
-IN_RANGE = False
+
+TARGET_ANGLE = None
+HEADING = 0
+SCAN = []
 
 class Camera:
     def __init__(self, port=0):
@@ -66,11 +69,12 @@ polyLowerGuide = [(0,480), (640, 480), leftDot, rightDot] # used for checking if
 
 def get_scan():
     # connect to lidar
-    lidar = RPLidar('COM4', baudrate=115200)
+    lidar = RPLidar('COM7', baudrate=115200)
     # get a single scan from lidar
-    for scan in lidar.iter_scans(max_buf_meas=500):
+    for scan in lidar.iter_scans(max_buf_meas=360):
         break
     # cleanly disconnect lidar
+    lidar.clean_input()
     lidar.stop()
     lidar.stop_motor()
     lidar.disconnect()
@@ -256,15 +260,66 @@ def centerBin (c, serialInst):
     return # bin should be centered (ish) on the camera
 
 
+def wander():
+    global TARGET_ANGLE
+    global SCAN
+    global HEADING
+    if len(SCAN) == 0:
+        scan = get_scan()
+        SCAN = get_farthest(scan)
+        pass
+
+    if not TARGET_ANGLE and not DETECTED:
+        TARGET_ANGLE = int(SCAN[1]+HEADING)
+        if TARGET_ANGLE > 360:
+            TARGET_ANGLE -=360
+    print(f"Heading:{HEADING}\nTarget:{TARGET_ANGLE}\nScan:{SCAN}\n")
+    if abs(HEADING - TARGET_ANGLE) > 5 and TARGET_ANGLE:
+        command = "rotate_"
+        #print(command)
+        serialInst.write(command.encode('utf-8'))
+        time.sleep(0.1)
+        angle = serialInst.readline().decode().strip('\n\r')
+        if angle:
+            HEADING = int(angle)
+        
+    elif not DETECTED:
+        scan = get_scan()
+        mins = np.min(scan, axis=1)
+        if mins[2] > 50:
+            command = "forward_"
+            print(command)
+            serialInst.write(command.encode('utf-8'))
+        else:
+            command = "stop_"
+            print(command)
+            serialInst.write(command.encode('utf-8'))
+            TARGET_ANGLE = None
+            SCAN = []
+            #move to rotate looking for recycling bin 
+
+
+def get_farthest(scan):
+    # turn the array into an np array
+    scan = np.array(scan)
+    # set initial farthest value
+    farthest = scan[0]
+    # iterate to find farthest point with a scan quality over 13
+    for point in scan:
+        if point[2] > farthest[2] and point[0]> 13:
+            farthest = point
+    # return farthest point
+    return farthest
+
 if __name__ == "__main__":
-    c = Camera()
+    c = Camera(0)
     on = True
     
     startTime = time.time()
 
     # establish connection to serial port
     ports = serial.tools.list_ports.comports()
-    serialInst = serial.Serial()
+    serialInst = serial.Serial(timeout=1)
     portsList = []
     
     for p in ports:
@@ -284,7 +339,7 @@ if __name__ == "__main__":
     
     # form connection
     serialInst.baudrate = 115200
-    serialInst.port = "COM5"
+    serialInst.port = "COM8"
     serialInst.open()
     time.sleep(0.05)
 
@@ -343,6 +398,8 @@ if __name__ == "__main__":
                 print(command)
                 serialInst.write(command.encode('utf-8'))
                 break
+            elif (DETECTED == False):
+                wander()
 
         
 
