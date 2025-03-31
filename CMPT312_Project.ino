@@ -27,6 +27,12 @@
    Orange to ~10/~11
 
 
+   Ir Receiver
+   ===========
+   Yellow R to 5V
+   Orange to GND
+   Yellow L to ~6
+
 */
 
 // BNO055
