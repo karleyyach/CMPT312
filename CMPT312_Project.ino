@@ -37,11 +37,10 @@
 
 // BNO055
 #define BNO055_SAMPLERATE_DELAY_MS (100)
-Adafruit_BNO055 bno = Adafruit_BNO055();
+Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 
 // Arm Servo
 Servo armServo;
-
 
 // Rover Servos
 #define ForwardFast 120
@@ -104,14 +103,16 @@ void loop() {
     }
     else if (msg == "dump") {
       dumpArm();
-
+    }
+    else if(msg ==  "rotate") {
+      roverTurnLeft();
+      sensors_event_t orientationData;
+      bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+      Serial.println((int)orientationData.orientation.x);
     }
   }
 
 }
-
-
-
 
 void dumpArm() {
   roverHalt();
