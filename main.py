@@ -162,11 +162,15 @@ def findColor(frame):
                 global DETECTED
                 DETECTED = True
                 print(DETECTED)
+                global BLUE_FRAME
+                BLUE_FRAME = True
                 frame = cv.putText(frame, "Blue Detected", (100, 150), cv.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
             else:
                 DETECTED = False
+                BLUE_FRAME = False
     else:
         DETECTED = False
+        BLUE_FRAME = False
     return frame
 
 
@@ -174,9 +178,6 @@ def withinRange(frame):
     blue_lower = np.array([148, 35, 16], np.uint8)
     blue_upper = np.array([190, 45, 30], np.uint8)
     mask = cv.inRange(frame, blue_lower, blue_upper)
-    # Uncomment these to see where the blue is detected
-    # res_blue = cv.bitwise_and(frame, frame, mask=mask)
-    # cv.imshow("mask", res_blue)
     coords = cv.findNonZero(mask)
     if coords is not None:
         for point in coords:
@@ -188,6 +189,51 @@ def withinRange(frame):
     else:
         IN_RANGE = False
     return
+
+BLUE_FRAME = False
+
+def centreBin (c, serialInst):
+    if(BLUE_FRAME == True):
+        left = False # x 0-320
+
+        right = False # x 321 - 640
+
+        while(left != True and right != True):
+
+            blue_lower = np.array([148, 35, 16], np.uint8)
+            blue_upper = np.array([190, 45, 30], np.uint8)
+            mask = cv.inRange(frame, blue_lower, blue_upper)
+            coords = cv.findNonZero(mask)
+            if coords is not None:
+                for point in coords:
+                    if (point[0][0] in range(0,320)):
+                        left = True
+                    elif(point[0][0] in range(321, 639)):
+                        right = True
+
+            if(left == True):
+                print("Bin on left")
+                command = "turnLeft"
+                serialInst.write(command.encode('utf-8'))
+                pass # call function to turn
+            elif(right == True):
+                print("Bin on right")
+                command = "turnRight"
+                serialInst.write(command.encode('utf-8'))
+                pass
+
+            c.captureFrame()
+            frame = c.getFrame()
+        
+            if frame is not None:
+                withinRange(frame)
+                cv.imshow('frame', findColor(drawGuide(frame)))
+
+    else:
+        return # blue isn't in frame; don't need to turn to center
+    
+    return # bin should be centered (ish) on the camera
+
 
 if __name__ == "__main__":
     c = Camera()

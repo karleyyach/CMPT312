@@ -5,16 +5,18 @@ import time
 import serial.tools.list_ports # for communication with arduino
 # pip install pyserial
 
-leftDot = (113, 413) # changed to be within where the can will fall
+leftDot = (113, 413) # where the can will fall
 leftEnd = (253, 327)
 
-rightDot = (575, 413) # changed to be within where the can will fall
+rightDot = (575, 413)
 rightEnd = (485, 327)
 
 DETECTED = False
 
+IN_RANGE = False
+
 class Camera:
-    def __init__(self, port=1):
+    def __init__(self, port=0):
         self.port = port
         self.camera = cv.VideoCapture(self.port)
         self.fourcc = cv.VideoWriter_fourcc(*'XVID')
@@ -58,7 +60,6 @@ def drawGuide(frame):
 polyWholeGuide = [(0,480), (640, 480), leftEnd, rightEnd]
 polyLowerGuide = [(0,480), (640, 480), leftDot, rightDot] # used for checking if within distance of bin
 # to stop and deposit can
-
 
 # more generalized form. pass in list of cords that make up the polygon
 # form of polygon = [(0,0), (0,1)] etc
@@ -150,10 +151,6 @@ def write_read(x):
     return False
 
 
-# rewrite to check the whole frame, and determine approximate locations of blue
-# by returning location???
-# check if on left or right of screen to determine what direction to turn.
-
 def findColor(frame):
     blue_lower = np.array([148, 35, 16], np.uint8)
     blue_upper = np.array([190, 45, 30], np.uint8)
@@ -163,21 +160,91 @@ def findColor(frame):
     # cv.imshow("mask", res_blue)
     coords = cv.findNonZero(mask)
     if coords is not None:
-        # for point in coords:
-        #     if checkPixel((point[0][0], point[0][1])):
         global DETECTED
         DETECTED = True
-                # print(DETECTED)
-        frame = cv.putText(frame, "Blue Detected", (100, 150), cv.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
+        global BLUE_FRAME
+        BLUE_FRAME = True
+        if(IN_RANGE == True):
+            frame = cv.putText(frame, "Within Range", (100, 150), cv.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
+        else:
+            frame = cv.putText(frame, "Blue Detected", (100, 150), cv.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
             # else:
             #     DETECTED = False
     else:
         DETECTED = False
+        BLUE_FRAME = False
+        
     return frame
+
+def withinRange(frame):
+    blue_lower = np.array([148, 35, 16], np.uint8)
+    blue_upper = np.array([190, 45, 30], np.uint8)
+    mask = cv.inRange(frame, blue_lower, blue_upper)
+    coords = cv.findNonZero(mask)
+    if coords is not None:
+        for point in coords:
+            if checkPixelPolygon((point[0][0], point[0][1]), polyLowerGuide):
+                global IN_RANGE
+                IN_RANGE = True
+            else:
+                IN_RANGE = False
+    else:
+        IN_RANGE = False
+    return
+
+BLUE_FRAME = False
+CENTER_BIN = False
+
+def centerBin (c, serialInst):
+    if(BLUE_FRAME == True):
+        left = False # x 0-320
+
+        right = False # x 321 - 640
+
+        while(left != True and right != True):
+
+            blue_lower = np.array([148, 35, 16], np.uint8)
+            blue_upper = np.array([190, 45, 30], np.uint8)
+            mask = cv.inRange(frame, blue_lower, blue_upper)
+            coords = cv.findNonZero(mask)
+            if coords is not None:
+                for point in coords:
+                    if (point[0][0] in range(0,320)):
+                        left = True
+                    elif(point[0][0] in range(321, 639)):
+                        right = True
+
+            if(left == True):
+                print("Bin on left")
+                command = "turnLeft"
+                serialInst.write(command.encode('utf-8'))
+                pass # call function to turn
+            elif(right == True):
+                print("Bin on right")
+                command = "turnRight"
+                serialInst.write(command.encode('utf-8'))
+                pass
+
+            c.captureFrame()
+            frame = c.getFrame()
+        
+            if frame is not None:
+                withinRange(frame)
+                cv.imshow('frame', findColor(drawGuide(frame)))
+
+    else:
+        return # blue isn't in frame; don't need to turn to center
+    
+    global CENTER_BIN 
+    CENTER_BIN = True
+    return # bin should be centered (ish) on the camera
+
 
 if __name__ == "__main__":
     c = Camera()
     on = False
+    
+    startTime = time.time()
 
     # establish connection to serial port
     ports = serial.tools.list_ports.comports()
@@ -200,7 +267,7 @@ if __name__ == "__main__":
     
     # form connection
     serialInst.baudrate = 115200
-    serialInst.port = "COM17"
+    serialInst.port = "COM5"
     serialInst.open()
     time.sleep(0.05)
 
@@ -210,6 +277,7 @@ if __name__ == "__main__":
     
     # continuously take in info from the camera and interpret it
     # based on what is seen, perform different actions
+    on=True
     while True:
         if(write_read(serialInst)):
             print(serialInst)
@@ -226,8 +294,14 @@ if __name__ == "__main__":
         if on:
             c.captureFrame()
             frame = c.getFrame()
+            
+            if(time.time() - startTime >= 300): # 5 minutes
+                c.closeCamera()
+                cv.destroyAllWindows()
+                quit()
 
             if frame is not None:
+                withinRange(frame)
                 frame = findColor(frame)
                 cv.imshow('frame', frame)
 
@@ -237,14 +311,21 @@ if __name__ == "__main__":
                 currentDetectedState = DETECTED
                 print(command)
             elif (DETECTED == True and currentDetectedState != DETECTED):
+                # ensure bin is in the center of the screen before moving forward
+                #if(CENTER_BIN == False):
+                    #centerBin()
                 command = "forward"
                 serialInst.write(command.encode('utf-8'))
                 currentDetectedState = DETECTED
                 print(command)
+                
                 # while moving forward, check distance between robot and recycle bin
                 # if within dump distance command = "dump"
+                if(IN_RANGE == True):
+                    command = "dump"
+                    print(command)
+                    serialInst.write(command.encode('utf-8'))
         
-            # print(currentDetectedState)
 
             # can use below code for error checking and to ensure info is passed
             #command = input("Command: ")
