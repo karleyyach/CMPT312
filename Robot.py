@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import time
+from rplidar import RPLidar
 
 import serial.tools.list_ports # for communication with arduino
 # pip install pyserial
@@ -13,6 +14,7 @@ rightEnd = (485, 327)
 
 DETECTED = False
 
+IN_RANGE = False
 IN_RANGE = False
 
 class Camera:
@@ -60,6 +62,20 @@ def drawGuide(frame):
 polyWholeGuide = [(0,480), (640, 480), leftEnd, rightEnd]
 polyLowerGuide = [(0,480), (640, 480), leftDot, rightDot] # used for checking if within distance of bin
 # to stop and deposit can
+
+
+def get_scan():
+    # connect to lidar
+    lidar = RPLidar('COM4', baudrate=115200)
+    # get a single scan from lidar
+    for scan in lidar.iter_scans(max_buf_meas=500):
+        break
+    # cleanly disconnect lidar
+    lidar.stop()
+    lidar.stop_motor()
+    lidar.disconnect()
+    # return scan
+    return scan
 
 # more generalized form. pass in list of cords that make up the polygon
 # form of polygon = [(0,0), (0,1)] etc
@@ -242,7 +258,7 @@ def centerBin (c, serialInst):
 
 if __name__ == "__main__":
     c = Camera()
-    on = False
+    on = True
     
     startTime = time.time()
 
@@ -258,6 +274,7 @@ if __name__ == "__main__":
     # picking COM port that arduino is on
     # won't need user input once connected with the pi, but varies from computer to computer
     # com = input("Select COM port for Arduino #: ")
+    # print(com)
     
     # for i in range(len(portsList)):
     #     # ensure input is valid
@@ -279,18 +296,18 @@ if __name__ == "__main__":
     # based on what is seen, perform different actions
     on=True
     while True:
-        if(write_read(serialInst)):
-            print(serialInst)
-            if not on:
-                c.captureFrame()
-                on = True
-            else:
-                on = False
-                command = "stop"
-                serialInst.write(command.encode('utf-8'))
-                c.closeCamera()
-                cv.destroyAllWindows()
-                break
+        # if(write_read(serialInst)):
+        #     # print(serialInst)
+        #     if not on:
+        #         c.captureFrame()
+        #         on = True
+        #     else:
+        #         on = False
+        #         command = "stop"
+        #         serialInst.write(command.encode('utf-8'))
+        #         c.closeCamera()
+        #         cv.destroyAllWindows()
+        #         break
         if on:
             c.captureFrame()
             frame = c.getFrame()
@@ -302,7 +319,7 @@ if __name__ == "__main__":
 
             if frame is not None:
                 withinRange(frame)
-                frame = findColor(frame)
+                frame = drawGuide(findColor(frame))
                 cv.imshow('frame', frame)
 
             if(DETECTED == False and currentDetectedState != DETECTED):# detected gets checked/altered in findColour()
@@ -318,13 +335,15 @@ if __name__ == "__main__":
                 serialInst.write(command.encode('utf-8'))
                 currentDetectedState = DETECTED
                 print(command)
-                
-                # while moving forward, check distance between robot and recycle bin
-                # if within dump distance command = "dump"
-                if(IN_RANGE == True):
-                    command = "dump"
-                    print(command)
-                    serialInst.write(command.encode('utf-8'))
+            elif(IN_RANGE == True):
+                # command = "stop"
+                # print(command)
+                # serialInst.write(command.encode('utf-8'))
+                command = "dump"
+                print(command)
+                serialInst.write(command.encode('utf-8'))
+                break
+
         
 
             # can use below code for error checking and to ensure info is passed

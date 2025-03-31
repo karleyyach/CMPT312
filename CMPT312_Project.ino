@@ -3,6 +3,7 @@
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 #include <Servo.h>
+#include <IRremote.hpp> // include the library
 
 /*
    BNO055 Gyroscope Connections
@@ -38,23 +39,26 @@ Servo armServo;
 
 // Rover Servos
 #define ForwardFast 120
-#define ForwardSlow 110
+#define ForwardSlow 100
 #define Stop 90
-#define ReverseSlow 70
+#define ReverseSlow 80
 #define ReverseFast 60
 // Time in ms for the Rover to turn. Must be fine tuned
-#define TurnTimer 750
+#define TurnTimer 150
+#define DECODE_NEC
+#define IR_RECEIVE_PIN 6
 Servo roverS1;
 Servo roverS2;
 
 
 
 void setup() {
-  // put your setup code here, to run once:
-
   Serial.begin(115200);
+  while (!Serial)
+      ; 
 
-
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+  pinMode(LED_BUILTIN, OUTPUT);
   /* BNO055 initalize */
   if (!bno.begin())
   {
@@ -73,16 +77,15 @@ void setup() {
   roverS1.attach(10);
   roverS2.attach(11);
 
-  // wait for button press 
-  
-
-
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  //dumpArm();
-  //delay(2000);
+  if(IrReceiver.decode()){
+    if (IrReceiver.decodedIRData.command == 0x1) {
+          Serial.println("Button Pressed = PLAY/PAUSE");
+        }
+    IrReceiver.resume();
+  }
 
   if(Serial.available() > 0) {
     String msg = Serial.readString(); // reads in from python
@@ -97,13 +100,7 @@ void loop() {
       dumpArm();
 
     }
-    
   }
-  //delay(2000);
-  //roverForward();
-  //delay(2000);
-  //roverHalt();
-  //delay(100000);
 
 }
 
@@ -111,7 +108,8 @@ void loop() {
 
 
 void dumpArm() {
-
+  roverHalt();
+  delay(1000);
   int pos;  
   for (pos = 90; pos <= 40; pos -= 1) { // goes from 0 degrees to 180 degrees
     // in steps of 1 degree
@@ -129,20 +127,20 @@ void dumpArm() {
 
 void roverTurnRight() {
   // Stop, and Turn
-  roverS1.write(ForwardFast);
-  roverS2.write(ReverseFast);
+  roverS1.write(ForwardSlow);
+  roverS2.write(ReverseSlow);
   delay(TurnTimer);
 }
 void roverTurnLeft() {
   // Stop, and Turn
-  roverS1.write(ForwardFast);
-  roverS2.write(ReverseFast);
+  roverS1.write(ForwardSlow);
+  roverS2.write(ReverseSlow);
   delay(TurnTimer);
 }
 
 void roverForward() {
-  roverS1.write(ForwardFast);
-  roverS2.write(ForwardFast);
+  roverS1.write(ForwardSlow);
+  roverS2.write(ForwardSlow);
 }
 
 void roverHalt () {
