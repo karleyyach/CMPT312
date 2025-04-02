@@ -15,6 +15,7 @@ rightEnd = (485, 327)
 DETECTED = False
 
 IN_RANGE = False
+ON = False
 
 TARGET_ANGLE = None
 HEADING = 0
@@ -162,12 +163,20 @@ def checkPixel(point):
     if (intersects % 2 == 1): return True # odd nums
     else: return False # even
 
-def write_read(x):
+def read(x):
     if x.in_waiting > 0:
         input = x.readline().decode('utf-8').strip()
         print(input)
-        if input == "Button Pressed = PLAY/PAUSE":
-            return True
+        if input == "PLAY/PAUSE":
+            return "PLAY/PAUSE"
+        elif input == "STOP":
+            return "STOP"
+        elif input == "UP":
+            return "UP"
+        elif input == "ROTATE":
+            return "ROTATE"
+        elif input == "WANDER":
+            return "WANDER"
     return False
 
 
@@ -276,7 +285,6 @@ def wander():
     print(f"Heading:{HEADING}\nTarget:{TARGET_ANGLE}\nScan:{SCAN}\n")
     if abs(HEADING - TARGET_ANGLE) > 5 and TARGET_ANGLE:
         command = "rotate_"
-        #print(command)
         serialInst.write(command.encode('utf-8'))
         time.sleep(0.1)
         angle = serialInst.readline().decode().strip('\n\r')
@@ -288,11 +296,9 @@ def wander():
         mins = np.min(scan, axis=1)
         if mins[2] > 50:
             command = "forward_"
-            print(command)
             serialInst.write(command.encode('utf-8'))
         else:
             command = "stop_"
-            print(command)
             serialInst.write(command.encode('utf-8'))
             TARGET_ANGLE = None
             SCAN = []
@@ -311,10 +317,26 @@ def get_farthest(scan):
     # return farthest point
     return farthest
 
+def testing(serialInst):
+    input = read(serialInst)
+
+    if input == "UP":
+        command = "forward"
+        serialInst.write(command.encode('utf-8'))
+    elif input == "ROTATE":
+        command = "rotate test"
+        serialInst.write(command.encode('utf-8'))
+    elif input == "STOP":
+        command = "stop"
+        serialInst.write(command.encode('utf-8'))
+    elif input == "DUMP":
+        command = "dump"
+        serialInst.write(command.encode('utf-8'))
+    elif input == "WANDER":
+        wander()
+
 if __name__ == "__main__":
     c = Camera(0)
-    on = True
-    
     startTime = time.time()
 
     # establish connection to serial port
@@ -339,7 +361,7 @@ if __name__ == "__main__":
     
     # form connection
     serialInst.baudrate = 115200
-    serialInst.port = "COM8"
+    serialInst.port = "COM17"
     serialInst.open()
     time.sleep(0.05)
 
@@ -351,7 +373,10 @@ if __name__ == "__main__":
     # based on what is seen, perform different actions
     on=True
     while True:
-        # if(write_read(serialInst)):
+        # Testing function using remote input
+        # testing(serialInst)
+
+        # if(read(serialInst)):
         #     # print(serialInst)
         #     if not on:
         #         c.captureFrame()
@@ -381,7 +406,6 @@ if __name__ == "__main__":
                 command = "stop"
                 serialInst.write(command.encode('utf-8'))
                 currentDetectedState = DETECTED
-                print(command)
             elif (DETECTED == True and currentDetectedState != DETECTED):
                 # ensure bin is in the center of the screen before moving forward
                 #if(CENTER_BIN == False):
@@ -400,8 +424,6 @@ if __name__ == "__main__":
                 break
             elif (DETECTED == False):
                 wander()
-
-        
 
             # can use below code for error checking and to ensure info is passed
             #command = input("Command: ")
