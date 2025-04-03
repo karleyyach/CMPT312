@@ -87,8 +87,29 @@ void setup() {
 void loop() {
   if(IrReceiver.decode()){
     if (IrReceiver.decodedIRData.command == 0x1) {
-          Serial.println("Button Pressed = PLAY/PAUSE");
+          Serial.println("PLAY/PAUSE");
+          delay(50);
         }
+    else if (IrReceiver.decodedIRData.command == 0x6){
+      Serial.println("STOP");
+      delay(50);
+    }
+    else if (IrReceiver.decodedIRData.command == 0x5){
+      Serial.println("UP");
+      delay(50);
+    }
+    else if (IrReceiver.decodedIRData.command == 0xE){
+      Serial.println("ROTATE");
+      delay(50);
+    }
+    else if (IrReceiver.decodedIRData.command == 0x9){
+      Serial.println("DUMP");
+      delay(50);
+    }
+    else if (IrReceiver.decodedIRData.command == 0x10){
+      Serial.println("WANDER");
+      delay(50);
+    }
     IrReceiver.resume();
   }
 
@@ -109,6 +130,9 @@ void loop() {
       sensors_event_t orientationData;
       bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
       Serial.println((int)orientationData.orientation.x);
+    }
+    else if(msg == "rotate test"){
+      roverTurnLeft();
     }
   }
 
